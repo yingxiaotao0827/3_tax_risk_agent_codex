@@ -1,0 +1,21 @@
+name: tax-risk-agent
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - fastapi=0.115.*
+  - uvicorn=0.34.*
+  - pydantic=2.*
+  - pydantic-settings=2.*
+  - pandas=2.2.*
+  - numpy=1.26.*
+  - matplotlib=3.9.*
+  - pytest=8.*
+  - pip:
+      - langchain==0.3.27
+      - langchain-core==0.3.72
+      - langchain-openai==0.3.28
+      - pymilvus==2.5.14
+      - python-dotenv==1.0.1
+

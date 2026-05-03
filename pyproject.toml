@@ -1,0 +1,10 @@
+[project]
+name = "tax-risk-agent"
+version = "0.1.0"
+description = "Tax risk diagnosis agent with ReAct orchestration, LangChain-compatible LLM client and Milvus rule retrieval."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+

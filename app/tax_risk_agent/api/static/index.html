@@ -1,0 +1,684 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>税务风险智能诊断分析系统</title>
+    <style>
+      :root {
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --text: #17202a;
+        --muted: #647184;
+        --line: #d9dee7;
+        --brand: #0f766e;
+        --brand-dark: #115e59;
+        --accent: #b45309;
+        --danger: #b91c1c;
+        --warn: #b45309;
+        --ok: #15803d;
+        --review: #475569;
+        --shadow: 0 8px 24px rgba(23, 32, 42, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        letter-spacing: 0;
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      .app-shell {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 320px minmax(0, 1fr);
+      }
+
+      .sidebar {
+        border-right: 1px solid var(--line);
+        background: #ffffff;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-height: 44px;
+      }
+
+      .brand-mark {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        background: var(--brand);
+        color: #ffffff;
+        display: grid;
+        place-items: center;
+        font-weight: 800;
+      }
+
+      .brand h1 {
+        margin: 0;
+        font-size: 18px;
+        line-height: 1.25;
+      }
+
+      .brand p {
+        margin: 3px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .form-panel {
+        display: grid;
+        gap: 14px;
+      }
+
+      label {
+        display: grid;
+        gap: 7px;
+        color: #2f3b4c;
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      input,
+      select {
+        width: 100%;
+        height: 40px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 0 12px;
+        background: #ffffff;
+        color: var(--text);
+        outline: none;
+      }
+
+      input:focus,
+      select:focus {
+        border-color: var(--brand);
+        box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
+      }
+
+      .button-row {
+        display: grid;
+        gap: 10px;
+        margin-top: 4px;
+      }
+
+      .button {
+        min-height: 42px;
+        border: 0;
+        border-radius: 6px;
+        padding: 0 14px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-weight: 700;
+      }
+
+      .button.primary {
+        background: var(--brand);
+        color: #ffffff;
+      }
+
+      .button.primary:hover {
+        background: var(--brand-dark);
+      }
+
+      .button.secondary {
+        background: #eef2f7;
+        color: #243244;
+      }
+
+      .button:disabled {
+        cursor: wait;
+        opacity: 0.72;
+      }
+
+      .status-box {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+        background: #fafbfc;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      main {
+        padding: 24px;
+        min-width: 0;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 18px;
+      }
+
+      .topbar h2 {
+        margin: 0;
+        font-size: 24px;
+        line-height: 1.2;
+      }
+
+      .topbar p {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .health {
+        min-width: 96px;
+        height: 34px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: #ffffff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        color: var(--muted);
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--review);
+      }
+
+      .dot.ok {
+        background: var(--ok);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+        gap: 18px;
+        align-items: start;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+        min-width: 0;
+      }
+
+      .panel-header {
+        min-height: 54px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .panel-header h3 {
+        margin: 0;
+        font-size: 16px;
+      }
+
+      .panel-body {
+        padding: 16px;
+      }
+
+      .summary {
+        color: #2d3748;
+        line-height: 1.7;
+        margin: 0;
+      }
+
+      .kpis {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .kpi {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+        background: #fbfcfd;
+        min-height: 76px;
+      }
+
+      .kpi span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .kpi strong {
+        display: block;
+        margin-top: 6px;
+        font-size: 22px;
+      }
+
+      .finding-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .finding {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+        background: #ffffff;
+      }
+
+      .finding-title {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+
+      .finding-title h4 {
+        margin: 0;
+        font-size: 15px;
+      }
+
+      .badge {
+        min-width: 56px;
+        height: 26px;
+        padding: 0 9px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .badge.high {
+        background: var(--danger);
+      }
+
+      .badge.medium {
+        background: var(--warn);
+      }
+
+      .badge.low {
+        background: var(--ok);
+      }
+
+      .badge.review_required {
+        background: var(--review);
+      }
+
+      .finding p {
+        margin: 0 0 10px;
+        color: #334155;
+        line-height: 1.65;
+      }
+
+      .section-label {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+        margin: 12px 0 8px;
+      }
+
+      .evidence,
+      .suggestions,
+      .trace {
+        margin: 0;
+        padding-left: 18px;
+        color: #334155;
+        line-height: 1.65;
+        font-size: 13px;
+      }
+
+      .evidence li + li,
+      .suggestions li + li,
+      .trace li + li {
+        margin-top: 6px;
+      }
+
+      .trace-panel {
+        position: sticky;
+        top: 18px;
+      }
+
+      .report-link {
+        color: var(--brand-dark);
+        font-weight: 750;
+        overflow-wrap: anywhere;
+      }
+
+      .empty {
+        border: 1px dashed #cbd5e1;
+        border-radius: 8px;
+        background: #ffffff;
+        min-height: 260px;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        color: var(--muted);
+        padding: 24px;
+      }
+
+      .empty strong {
+        display: block;
+        color: #243244;
+        margin-bottom: 6px;
+      }
+
+      .toast {
+        min-height: 38px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .toast.error {
+        color: var(--danger);
+      }
+
+      @media (max-width: 980px) {
+        .app-shell {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        .trace-panel {
+          position: static;
+        }
+      }
+
+      @media (max-width: 620px) {
+        main,
+        .sidebar {
+          padding: 16px;
+        }
+
+        .topbar {
+          flex-direction: column;
+        }
+
+        .kpis {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">税</div>
+          <div>
+            <h1>税务风险智能诊断</h1>
+            <p>Agent 测试控制台</p>
+          </div>
+        </div>
+
+        <form class="form-panel" id="diagnosticForm">
+          <label>
+            企业编号
+            <input id="companyId" value="demo_co" autocomplete="off" />
+          </label>
+
+          <label>
+            会计期间
+            <select id="period">
+              <option value="2025Q2">2025Q2</option>
+            </select>
+          </label>
+
+          <label>
+            最大推理轮次
+            <input id="maxRounds" type="number" min="1" max="12" value="6" />
+          </label>
+
+          <div class="button-row">
+            <button class="button primary" type="submit" id="runButton">运行诊断</button>
+            <button class="button secondary" type="button" id="seedButton">重置样例数据</button>
+          </div>
+        </form>
+
+        <div class="status-box">
+          <strong>样例数据</strong><br />
+          `demo_co` 会触发差旅费异常占比和税负率偏低两类风险，适合演示完整链路。
+        </div>
+
+        <div class="toast" id="toast"></div>
+      </aside>
+
+      <main>
+        <div class="topbar">
+          <div>
+            <h2>诊断结果</h2>
+            <p>展示结构化风险结论、证据链、整改建议和 Agent 推理步骤。</p>
+          </div>
+          <div class="health" id="healthBadge"><span class="dot" id="healthDot"></span><span id="healthText">未检测</span></div>
+        </div>
+
+        <div id="emptyState" class="empty">
+          <div>
+            <strong>等待运行诊断</strong>
+            填写企业编号和期间后点击“运行诊断”。
+          </div>
+        </div>
+
+        <div class="grid" id="resultGrid" hidden>
+          <section class="panel">
+            <div class="panel-header">
+              <h3>风险总览</h3>
+              <a class="report-link" id="reportPath" href="#" target="_blank" rel="noreferrer"></a>
+            </div>
+            <div class="panel-body">
+              <p class="summary" id="summary"></p>
+              <div class="kpis">
+                <div class="kpi">
+                  <span>风险数量</span>
+                  <strong id="findingCount">0</strong>
+                </div>
+                <div class="kpi">
+                  <span>最高风险</span>
+                  <strong id="highestLevel">-</strong>
+                </div>
+                <div class="kpi">
+                  <span>人工复核</span>
+                  <strong id="reviewFlag">-</strong>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel trace-panel">
+            <div class="panel-header">
+              <h3>Agent 推理链</h3>
+            </div>
+            <div class="panel-body">
+              <ol class="trace" id="traceList"></ol>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h3>风险明细</h3>
+            </div>
+            <div class="panel-body">
+              <div class="finding-list" id="findingList"></div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      const form = document.querySelector("#diagnosticForm");
+      const seedButton = document.querySelector("#seedButton");
+      const runButton = document.querySelector("#runButton");
+      const toast = document.querySelector("#toast");
+      const emptyState = document.querySelector("#emptyState");
+      const resultGrid = document.querySelector("#resultGrid");
+      const healthDot = document.querySelector("#healthDot");
+      const healthText = document.querySelector("#healthText");
+      const apiBase = window.location.protocol === "file:" ? "http://127.0.0.1:8000" : "";
+
+      const levelLabels = {
+        high: "高",
+        medium: "中",
+        low: "低",
+        review_required: "复核",
+      };
+
+      function setToast(message, isError = false) {
+        toast.textContent = message;
+        toast.classList.toggle("error", isError);
+      }
+
+      function setBusy(isBusy) {
+        runButton.disabled = isBusy;
+        seedButton.disabled = isBusy;
+        runButton.textContent = isBusy ? "诊断中..." : "运行诊断";
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function highestRisk(findings) {
+        const order = ["review_required", "low", "medium", "high"];
+        return findings.reduce((highest, finding) => {
+          return order.indexOf(finding.level) > order.indexOf(highest) ? finding.level : highest;
+        }, "low");
+      }
+
+      function renderResult(data) {
+        emptyState.hidden = true;
+        resultGrid.hidden = false;
+
+        document.querySelector("#summary").textContent = data.executive_summary || "本轮诊断未生成摘要。";
+        document.querySelector("#findingCount").textContent = data.findings.length;
+        const topLevel = data.findings.length ? highestRisk(data.findings) : "low";
+        document.querySelector("#highestLevel").textContent = levelLabels[topLevel] || topLevel;
+        document.querySelector("#reviewFlag").textContent = data.needs_human_review ? "是" : "否";
+
+        const reportPath = document.querySelector("#reportPath");
+        reportPath.textContent = data.report_path ? "报告：" + data.report_path : "";
+        reportPath.removeAttribute("href");
+
+        const traceList = document.querySelector("#traceList");
+        traceList.innerHTML = data.reasoning_trace.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+
+        const findingList = document.querySelector("#findingList");
+        findingList.innerHTML = data.findings
+          .map((finding) => {
+            const evidence = finding.evidence
+              .map((item) => `<li>${escapeHtml(item.summary)} <strong>${Math.round(item.confidence * 100)}%</strong></li>`)
+              .join("");
+            const suggestions = finding.suggestions.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+            return `
+              <article class="finding">
+                <div class="finding-title">
+                  <h4>${escapeHtml(finding.title)}</h4>
+                  <span class="badge ${escapeHtml(finding.level)}">${escapeHtml(levelLabels[finding.level] || finding.level)}</span>
+                </div>
+                <p>${escapeHtml(finding.conclusion)}</p>
+                <div class="section-label">证据链</div>
+                <ul class="evidence">${evidence || "<li>暂无证据</li>"}</ul>
+                <div class="section-label">整改建议</div>
+                <ul class="suggestions">${suggestions || "<li>暂无建议</li>"}</ul>
+              </article>
+            `;
+          })
+          .join("");
+
+        healthDot.classList.add("ok");
+        healthText.textContent = "接口正常";
+      }
+
+      async function seedDemoData() {
+        setBusy(true);
+        setToast("正在重置样例数据...");
+        try {
+          const response = await fetch(`${apiBase}/api/v1/demo/seed`, { method: "POST" });
+          if (!response.ok) throw new Error(await response.text());
+          setToast("样例数据已重置，可以运行诊断。");
+        } catch (error) {
+          setToast("重置失败：" + error.message, true);
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function runDiagnostic(event) {
+        event.preventDefault();
+        setBusy(true);
+        setToast("Agent 正在补充证据并生成报告...");
+        const payload = {
+          company_id: document.querySelector("#companyId").value.trim(),
+          period: document.querySelector("#period").value,
+          max_rounds: Number(document.querySelector("#maxRounds").value || 6),
+        };
+
+        try {
+          const response = await fetch(`${apiBase}/api/v1/diagnostics/run`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!response.ok) throw new Error(await response.text());
+          renderResult(await response.json());
+          setToast("诊断完成。");
+        } catch (error) {
+          setToast("诊断失败：" + error.message, true);
+          healthDot.classList.remove("ok");
+          healthText.textContent = "调用失败";
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      seedButton.addEventListener("click", seedDemoData);
+      form.addEventListener("submit", runDiagnostic);
+    </script>
+  </body>
+</html>
