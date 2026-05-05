@@ -157,7 +157,7 @@ LLM 自主驱动的 ReAct loop
 
 ## 项目中最准确的说法
 
-面试时建议这样说：
+View时建议这样说：
 
 > 我这个项目不是开放式无限循环的 ReAct Agent，而是一个受控 ReAct-style 税务诊断 Agent。它保留了 ReAct 的核心思想：先生成风险假设，再调用 SQL、Python 指标计算和规则检索工具获取 Observation，然后基于工具返回的证据更新判断并生成结论。不同的是，我没有让 LLM 完全自由决定工具调用顺序，而是用业务状态机和风险场景配置约束流程，保证税务风控场景下的可控性、可审计性和稳定性。
 
@@ -208,4 +208,3 @@ LLM 动态选择工具
 ## 一句话总结
 
 > 当前项目可以称为 ReAct-style Agent，因为它具备 Thought-Action-Observation 的推理和工具调用链路；但它不是完全开放式 ReAct Agent。更准确的说法是：基于 ReAct 思想的受控税务风险诊断 Agent 状态机。
-

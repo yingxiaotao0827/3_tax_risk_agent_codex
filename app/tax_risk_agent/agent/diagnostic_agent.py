@@ -1,3 +1,14 @@
+"""税务风险诊断智能体模块
+
+本模块负责组织企业税务健康诊断的完整执行流程：读取企业期间财务与发票数据，
+调用指标计算、规则检索、SQL 查询、交叉验证、图表渲染和报告生成等组件，
+将风险场景评估结果汇总为结构化的 `DiagnosticResult`。
+
+核心类 `TaxRiskDiagnosticAgent` 是应用层编排入口；`RiskScenario` 描述单个
+可自动化评估的风险场景；模块内的默认场景覆盖差旅费异常、增值税税负率偏低
+和咨询服务费集中复核等演示风险。
+"""
+
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,8 +41,12 @@ class RiskScenario:
 
 
 def vat_gross_margin_cross_check(metrics: dict, benchmarks: dict) -> Evidence | None:
+    """使用毛利率基准对增值税税负率偏低场景进行交叉验证。"""
+    # 流程 1：先从已计算指标和行业基准中取出交叉验证所需的毛利率数据。
     gross_margin_p50 = benchmarks.get("gross_margin", {}).get("p50")
     gross_margin = metrics.get("gross_margin")
+
+    # 流程 2：如果任一数据缺失，不能完成自动验证，只返回低置信度证据供人工参考。
     if gross_margin is None or gross_margin_p50 is None:
         return Evidence(
             source="benchmark_cross_check",
@@ -39,6 +54,8 @@ def vat_gross_margin_cross_check(metrics: dict, benchmarks: dict) -> Evidence | 
             data={"gross_margin": gross_margin, "gross_margin_p50": gross_margin_p50},
             confidence=0.45,
         )
+
+    # 流程 3：毛利率不低但增值税税负率偏低时，形成支持风险判断的交叉证据。
     if gross_margin >= gross_margin_p50:
         return Evidence(
             source="benchmark_cross_check",
@@ -46,6 +63,8 @@ def vat_gross_margin_cross_check(metrics: dict, benchmarks: dict) -> Evidence | 
             data={"gross_margin": gross_margin, "gross_margin_p50": gross_margin_p50},
             confidence=0.78,
         )
+
+    # 流程 4：毛利率同步偏低时，交叉验证不支持风险升级，返回 None 让主流程跳过该风险。
     return None
 
 
@@ -110,6 +129,8 @@ class TaxRiskDiagnosticAgent:
         llm_client: LLMClient | None = None,
         risk_scenarios: list[RiskScenario] | None = None,
     ):
+        """初始化诊断智能体所需的数据、工具、报告和大模型依赖。"""
+        # 流程准备：保存外部依赖，并把数据库封装为安全 SQL 工具，供后续步骤统一调用。
         self.database = database
         self.sql_tool = SafeSqlTool(database)
         self.metric_tool = MetricTool()
@@ -120,12 +141,17 @@ class TaxRiskDiagnosticAgent:
         self.risk_scenarios = risk_scenarios or DEFAULT_RISK_SCENARIOS
 
     def run(self, request: DiagnosticRequest) -> DiagnosticResult:
+        """执行一次完整税务风险诊断，并返回结构化诊断结果。"""
+        # 流程 1：初始化本次诊断的过程轨迹、风险发现和图表路径容器。
         trace: list[str] = []
         findings: list[RiskFinding] = []
         chart_paths: list[Path] = []
 
+        # 流程 2：先读取企业期间财务数据；这是后续指标计算和风险判断的基础输入。
         trace.append(f"{AgentState.THINK.value}: 读取企业 {request.company_id} 在 {request.period} 的财务与发票数据，准备按风险场景生成诊断假设。")
         financial = self._load_financial(request, trace)
+
+        # 流程 3：如果基础财务数据缺失，诊断无法继续，直接返回需要人工复核的结果。
         if financial is None:
             return DiagnosticResult(
                 company_id=request.company_id,
@@ -144,13 +170,16 @@ class TaxRiskDiagnosticAgent:
                 needs_human_review=True,
             )
 
+        # 流程 4：基于财务数据计算标准化指标，为所有风险场景提供统一度量口径。
         metrics = self.metric_tool.calculate(financial)
         trace.append(f"{AgentState.ACT.value}: 调用 Python 指标计算工具，得到 {', '.join(sorted(metrics))}。")
 
+        # 流程 5：读取行业基准并召回税务规则，作为风险判断的外部参照和法规依据。
         benchmarks = self._load_benchmarks(request, trace)
         all_rules = self.rule_tool.run("tax risk invoice expense vat consulting revenue")
         trace.append(f"{AgentState.ACT.value}: 调用规则库检索工具召回 {len(all_rules)} 条候选税务规则。")
 
+        # 流程 6：逐个风险场景评估指标、基准、规则和明细证据，命中时沉淀为风险发现。
         for scenario in self.risk_scenarios:
             trace.append(f"{AgentState.THINK.value}: 基于风险场景 {scenario.code} 生成假设：{scenario.title}。")
             finding = self._evaluate_scenario(
@@ -164,8 +193,10 @@ class TaxRiskDiagnosticAgent:
             if finding:
                 findings.append(finding)
 
+        # 流程 7：把规则库召回但当前场景未覆盖的规则补充为人工复核提示，避免遗漏潜在线索。
         findings.extend(self._surface_unhandled_rules(all_rules, findings, trace))
 
+        # 流程 8：如果没有任何自动化发现，也输出兜底复核结论，提示补充数据后再判断。
         if not findings:
             findings.append(
                 RiskFinding(
@@ -183,14 +214,17 @@ class TaxRiskDiagnosticAgent:
             "本次请求执行一次完整诊断闭环。若后续补充合同、付款流水或行业基准，应基于新证据重新发起诊断。"
         )
 
+        # 流程 9：根据指标和行业基准生成可视化图表，并把图表路径写入结果。
         chart = render_metric_chart(metrics, benchmarks, self.chart_dir / request.company_id / request.period)
         if chart:
             chart_paths.append(chart)
             trace.append(f"{AgentState.ACT.value}: 调用代码解释器能力生成指标对比图表。")
 
+        # 流程 10：调用摘要链生成管理层摘要；离线模式下由确定性客户端兜底。
         executive_summary = self.llm_client.summarize_findings(findings)
         trace.append(f"{AgentState.ACT.value}: 调用 LangChain/Qwen 摘要链生成报告摘要；离线模式使用确定性摘要兜底。")
 
+        # 流程 11：先记录预期报告路径，再组装完整 DiagnosticResult 交给报告生成器渲染。
         expected_report_path = self.report_generator.report_dir / f"{request.company_id}_{request.period}_tax_health_report.md"
         trace.append(f"{AgentState.CONCLUDE.value}: 输出企业税务健康体检报告 {expected_report_path}。")
 
@@ -203,25 +237,37 @@ class TaxRiskDiagnosticAgent:
             chart_paths=chart_paths,
             needs_human_review=any(finding.level == RiskLevel.review_required for finding in findings),
         )
+
+        # 流程 12：生成 Markdown 报告并把真实报告路径回写到诊断结果中。
         result.report_path = self.report_generator.render(result)
         return result
 
     def _load_financial(self, request: DiagnosticRequest, trace: list[str]) -> dict | None:
+        """按企业和期间读取财务数据，缺失时记录人工复核轨迹。"""
+        # 流程：使用参数化查询读取指定企业和期间的财务报表记录。
         rows = self.sql_tool.run(
             "SELECT * FROM financial_statements WHERE company_id = ? AND period = ?",
             (request.company_id, request.period),
         )
+
+        # 分支：没有数据时追加人工复核轨迹，并让主流程提前结束。
         if not rows:
             trace.append(f"{AgentState.HUMAN_REVIEW.value}: 未找到企业期间数据，建议人工确认数据口径。")
             return None
+
+        # 分支：当前设计按企业期间唯一记录处理，返回第一条财务数据。
         return rows[0]
 
     def _load_benchmarks(self, request: DiagnosticRequest, trace: list[str]) -> dict[str, dict]:
+        """读取当前期间的软件服务行业指标分位基准。"""
+        # 流程：读取行业分位数基准，后续场景会按 metric 名称快速索引。
         rows = self.sql_tool.run(
             "SELECT metric, p50, p75, p90 FROM industry_benchmarks WHERE industry = ? AND period = ?",
             ("software_services", request.period),
         )
         trace.append(f"{AgentState.ACT.value}: 调用 SQL 查询器读取软件服务行业 {request.period} 分位基准。")
+
+        # 输出：把多行查询结果转成以指标名为 key 的字典，便于风险场景取阈值。
         return {row["metric"]: row for row in rows}
 
     def _evaluate_scenario(
@@ -233,12 +279,15 @@ class TaxRiskDiagnosticAgent:
         rules: list[dict],
         trace: list[str],
     ) -> RiskFinding | None:
+        """评估单个风险场景，并在触发风险或需要复核时生成风险发现。"""
         trace.append(f"{AgentState.EVALUATE_EVIDENCE.value}: 评估 {scenario.title} 的指标、行业基准、规则和明细证据。")
 
+        # 流程 1：取出该场景关注的企业指标值、行业基准阈值和匹配规则。
         metric_value = metrics.get(scenario.metric)
         benchmark_value = benchmarks.get(scenario.benchmark_metric, {}).get(scenario.benchmark_field)
         matched_rule = self._match_rule(scenario, rules)
 
+        # 分支 1：缺少企业指标时无法做自动判断，直接生成复核类风险发现。
         if metric_value is None:
             return self._review_required(
                 scenario=scenario,
@@ -246,6 +295,7 @@ class TaxRiskDiagnosticAgent:
                 evidence=[],
             )
 
+        # 流程 2：先把企业指标本身沉淀为第一条证据，后续再叠加基准、发票和规则证据。
         evidence = [
             Evidence(
                 source="python_metric_tool",
@@ -255,6 +305,7 @@ class TaxRiskDiagnosticAgent:
             )
         ]
 
+        # 分支 2：缺少行业基准时不能做阈值比较，保留已有证据并转人工复核。
         if benchmark_value is None:
             trace.append(f"{AgentState.HUMAN_REVIEW.value}: {scenario.title} 缺少行业基准 {scenario.benchmark_metric}.{scenario.benchmark_field}，转人工复核。")
             if matched_rule:
@@ -270,6 +321,7 @@ class TaxRiskDiagnosticAgent:
                 evidence=evidence,
             )
 
+        # 流程 3：行业基准存在时，把基准阈值也作为证据纳入判断链路。
         evidence.append(
             Evidence(
                 source="industry_benchmark",
@@ -279,20 +331,24 @@ class TaxRiskDiagnosticAgent:
             )
         )
 
+        # 分支 3：指标没有越过场景配置的阈值时，该场景不触发风险。
         if not self._compare(metric_value, benchmark_value, scenario.operator):
             trace.append(
                 f"{AgentState.CONCLUDE.value}: {scenario.title} 未触发，{metric_value:.2%} 未满足 {scenario.operator} {benchmark_value:.2%}。"
             )
             return None
 
+        # 流程 4：如果场景需要发票类别明细，则补充查询对手方集中度证据。
         if scenario.invoice_category:
             invoice_evidence = self._invoice_concentration_evidence(request, scenario.invoice_category)
             evidence.append(invoice_evidence)
             trace.append(f"{AgentState.OBSERVE.value}: 补充查询 {scenario.invoice_category} 类发票对手方集中度。")
 
+        # 流程 5：把匹配到的规则库内容追加到证据链，作为法规或规则依据。
         if matched_rule:
             evidence.append(self._rule_evidence(matched_rule))
 
+        # 流程 6：如果场景配置了交叉验证函数，则用额外指标关系确认风险是否成立。
         if scenario.cross_check:
             cross_evidence = scenario.cross_check(metrics, benchmarks)
             if cross_evidence is None:
@@ -301,6 +357,7 @@ class TaxRiskDiagnosticAgent:
             evidence.append(cross_evidence)
             trace.append(f"{AgentState.RESOLVE_CONFLICT.value}: {scenario.title} 完成交叉验证。")
 
+        # 流程 7：所有必要证据齐备后，组装最终风险发现返回给主流程。
         return RiskFinding(
             code=scenario.code,
             title=scenario.title,
@@ -316,6 +373,8 @@ class TaxRiskDiagnosticAgent:
         )
 
     def _invoice_concentration_evidence(self, request: DiagnosticRequest, category: str) -> Evidence:
+        """查询指定发票类别的对手方集中情况，并封装为证据。"""
+        # 流程 1：按企业、期间和发票类别聚合对手方数量及金额，并按金额倒序排列。
         rows = self.sql_tool.run(
             """
             SELECT counterparty, COUNT(*) AS invoice_count, SUM(amount) AS amount
@@ -326,6 +385,8 @@ class TaxRiskDiagnosticAgent:
             """,
             (request.company_id, request.period, category),
         )
+
+        # 流程 2：取金额最高的对手方作为摘要重点；无发票时使用“未知”并降低证据置信度。
         top_counterparty = rows[0]["counterparty"] if rows else "未知"
         return Evidence(
             source="sql_invoice_query",
@@ -335,9 +396,13 @@ class TaxRiskDiagnosticAgent:
         )
 
     def _surface_unhandled_rules(self, rules: list[dict], findings: list[RiskFinding], trace: list[str]) -> list[RiskFinding]:
+        """将已召回但尚无自动化采集器覆盖的规则转为人工复核提示。"""
+        # 流程 1：先收集已处理的发现编码和已配置的场景编码，避免重复生成提示。
         handled_codes = {finding.code for finding in findings}
         scenario_codes = {scenario.code for scenario in self.risk_scenarios}
         review_findings = []
+
+        # 流程 2：遍历召回规则，只对未被当前自动化场景覆盖的规则生成复核发现。
         for rule in rules:
             rule_id = rule.get("rule_id")
             if not rule_id or rule_id in handled_codes or rule_id in scenario_codes:
@@ -353,9 +418,13 @@ class TaxRiskDiagnosticAgent:
                     suggestions=["补充该风险场景的数据口径、指标计算器和专项证据查询工具。"],
                 )
             )
+
+        # 输出：把额外复核提示交回主流程，与自动化场景发现合并。
         return review_findings
 
     def _review_required(self, scenario: RiskScenario, reason: str, evidence: list[Evidence]) -> RiskFinding:
+        """根据风险场景、复核原因和证据构造人工复核类风险发现。"""
+        # 流程：统一创建 review_required 级别的发现，保持缺数据和缺基准等分支输出一致。
         return RiskFinding(
             code=scenario.code,
             title=scenario.title,
@@ -366,13 +435,19 @@ class TaxRiskDiagnosticAgent:
         )
 
     def _match_rule(self, scenario: RiskScenario, rules: list[dict]) -> dict | None:
+        """优先从候选规则中匹配场景规则，必要时按场景查询词单独检索。"""
+        # 流程 1：优先复用主流程已经召回的候选规则，减少重复检索。
         for rule in rules:
             if rule.get("rule_id") == scenario.code:
                 return rule
+
+        # 流程 2：候选规则没有命中时，再按场景自带查询词做一次定向检索。
         scenario_rules = self.rule_tool.run(scenario.rule_query, top_k=1)
         return scenario_rules[0] if scenario_rules else None
 
     def _rule_evidence(self, rule: dict) -> Evidence:
+        """将规则库命中的规则内容转换为 Evidence 证据对象。"""
+        # 流程：把原始规则字典封装为统一 Evidence，便于报告和结果模型消费。
         return Evidence(
             source="rule_retrieval_tool",
             summary=rule["content"],
@@ -381,6 +456,8 @@ class TaxRiskDiagnosticAgent:
         )
 
     def _compare(self, metric_value: float, benchmark_value: float, operator: str) -> bool:
+        """按照配置的比较运算符判断指标值是否触发基准阈值。"""
+        # 流程：根据风险场景配置的比较符，执行对应的阈值判断。
         if operator == ">":
             return metric_value > benchmark_value
         if operator == ">=":
@@ -389,4 +466,6 @@ class TaxRiskDiagnosticAgent:
             return metric_value < benchmark_value
         if operator == "<=":
             return metric_value <= benchmark_value
+
+        # 防御：如果场景配置了未支持的比较符，显式抛错暴露配置问题。
         raise ValueError(f"Unsupported operator: {operator}")
