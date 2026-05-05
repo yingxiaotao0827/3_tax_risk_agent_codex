@@ -151,7 +151,7 @@ class TaxRiskDiagnosticAgent:
         all_rules = self.rule_tool.run("tax risk invoice expense vat consulting revenue")
         trace.append(f"{AgentState.ACT.value}: 调用规则库检索工具召回 {len(all_rules)} 条候选税务规则。")
 
-        for scenario in self.risk_scenarios[: request.max_rounds]:
+        for scenario in self.risk_scenarios:
             trace.append(f"{AgentState.THINK.value}: 基于风险场景 {scenario.code} 生成假设：{scenario.title}。")
             finding = self._evaluate_scenario(
                 request=request,
@@ -178,7 +178,10 @@ class TaxRiskDiagnosticAgent:
                 )
             )
 
-        trace.append(f"{AgentState.CHECK_BUDGET.value}: 已按 {len(self.risk_scenarios)} 个风险场景完成诊断，最大预算为 {request.max_rounds}。")
+        trace.append(
+            f"{AgentState.CHECK_BUDGET.value}: 已完成 {len(self.risk_scenarios)} 个风险场景扫描；"
+            "本次请求执行一次完整诊断闭环。若后续补充合同、付款流水或行业基准，应基于新证据重新发起诊断。"
+        )
 
         chart = render_metric_chart(metrics, benchmarks, self.chart_dir / request.company_id / request.period)
         if chart:

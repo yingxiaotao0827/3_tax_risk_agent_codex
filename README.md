@@ -36,7 +36,7 @@ http://127.0.0.1:8000/
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/diagnostics/run \
   -H 'Content-Type: application/json' \
-  -d '{"company_id":"demo_co","period":"2025Q2","max_rounds":6}'
+  -d '{"company_id":"demo_co","period":"2025Q2"}'
 ```
 
 ## 可选：启动 Milvus

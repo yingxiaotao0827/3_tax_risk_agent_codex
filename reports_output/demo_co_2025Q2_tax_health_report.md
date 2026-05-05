@@ -58,6 +58,6 @@
 11. think: 基于风险场景 CONSULTING_CLUSTER 生成假设：咨询服务费集中复核风险。
 12. evaluate_evidence: 评估 咨询服务费集中复核风险 的指标、行业基准、规则和明细证据。
 13. human_review: 咨询服务费集中复核风险 缺少行业基准 consulting_expense_ratio.p75，转人工复核。
-14. check_budget: 已按 3 个风险场景完成诊断，最大预算为 6。
+14. check_budget: 已完成 3 个风险场景扫描；本次请求执行一次完整诊断闭环。若后续补充合同、付款流水或行业基准，应基于新证据重新发起诊断。
 15. act: 调用 LangChain/Qwen 摘要链生成报告摘要；离线模式使用确定性摘要兜底。
 16. conclude: 输出企业税务健康体检报告 reports_output/demo_co_2025Q2_tax_health_report.md。

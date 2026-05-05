@@ -39,7 +39,6 @@ class RiskFinding(BaseModel):
 class DiagnosticRequest(BaseModel):
     company_id: str
     period: str
-    max_rounds: int = 6
 
 
 class DiagnosticResult(BaseModel):

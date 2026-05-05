@@ -150,8 +150,7 @@ POST /api/v1/diagnostics/run
 ```json
 {
   "company_id": "demo_co",
-  "period": "2025Q2",
-  "max_rounds": 6
+  "period": "2025Q2"
 }
 ```
 
@@ -255,4 +254,3 @@ flowchart TD
     O --> P["生成图表和 Markdown 报告"]
     P --> Q["输出企业税务健康体检报告"]
 ```
-

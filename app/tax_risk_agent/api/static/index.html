@@ -465,11 +465,6 @@
             </select>
           </label>
 
-          <label>
-            最大推理轮次
-            <input id="maxRounds" type="number" min="1" max="12" value="6" />
-          </label>
-
           <div class="button-row">
             <button class="button primary" type="submit" id="runButton">运行诊断</button>
             <button class="button secondary" type="button" id="seedButton">重置样例数据</button>
@@ -656,7 +651,6 @@
         const payload = {
           company_id: document.querySelector("#companyId").value.trim(),
           period: document.querySelector("#period").value,
-          max_rounds: Number(document.querySelector("#maxRounds").value || 6),
         };
 
         try {
